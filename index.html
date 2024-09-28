@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Script</title>
+    <script src="https://unpkg.com/dropbox/dist/Dropbox-sdk.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+        h1 {
+            text-align: center;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            margin-bottom: 10px;
+            font-family: monospace;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .options {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background-color: #e9e9e9;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Gerador de Script Bash</h1>
+
+    <textarea id="ipInput" placeholder="Cole os IPs aqui, um por linha..."></textarea>
+    
+    <div class="options">
+        <label><input type="checkbox" id="nmap"> nmap</label>
+        <label><input type="checkbox" id="xframe"> Teste de Vulnerabilidade X-Frame-Options</label>
+    </div>
+
+    <button onclick="processarIPs()">Gerar Script e Enviar para Dropbox</button>
+
+    <div id="output"></div>
+
+    <script>
+        function processarIPs() {
+            const ipInput = document.getElementById('ipInput').value.trim();
+            const ipList = ipInput.split('\n').filter(ip => ip.trim() !== '');
+            const useNmap = document.getElementById('nmap').checked;
+            const useXFrame = document.getElementById('xframe').checked;
+
+            const outputDiv = document.getElementById('output');
+            const scriptContent = gerarScript(ipList, useNmap, useXFrame);
+            outputDiv.innerHTML = `<pre>${scriptContent}</pre>`;
+            uploadToDropbox(scriptContent, `script_${Date.now()}.sh`); // Salvar como script_timestamp.sh
+        }
+
+        function gerarScript(ips, useNmap, useXFrame) {
+            let script = '#!/bin/bash\n\n';
+            script += '# Script gerado automaticamente\n\n';
+
+            ips.forEach(ip => {
+                script += `echo "Processando IP: ${ip}"\n`;
+                if (useNmap) {
+                    script += `nmap -A ${ip}\n`;
+                }
+                if (useXFrame) {
+                    script += `echo "<html><head><title>${ip}</title></head><body><h1>ESTE SITE É VULNERÁVEL AO CLICKJACKING</h1></body></html>" > ${ip}.html\n`;
+                }
+            });
+
+            return script;
+        }
+
+        function uploadToDropbox(content, fileName) {
+            const accessToken = 'sl.B9fyHexoYNel8CbwygvDYlHcTixm_SSUKyL72kyLdoKt8PXKGs7oo_TLt0GWhBtQqwf0fkkf9MvwFB7UwAXy_Sb4lYoZV0BOcwxZqNzYmMX7ktsuW2ydB__UL6RB4d-PHs177oza4VOjCGkeuQj_pm8';
+            const dbx = new Dropbox.Dropbox({ accessToken });
+
+            dbx.filesUpload({ path: '/' + fileName, contents: content })
+                .then(function (response) {
+                    console.log('Arquivo enviado com sucesso:', response);
+                })
+                .catch(function (error) {
+                    console.error('Erro ao fazer upload:', error);
+                    alert('Erro ao fazer upload: ' + error.message);
+                });
+        }
+    </script>
+
+</body>
+</html>

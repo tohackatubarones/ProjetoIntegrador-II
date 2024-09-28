@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Script</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+        h1 {
+            text-align: center;
+        }
+        textarea {
+            width: 100%;
+            height: 200px;
+            margin-bottom: 10px;
+            font-family: monospace;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        .options, .nmap-options {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #output {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background-color: #e9e9e9;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Gerador de Script Bash</h1>
+
+    
+    <textarea id="ipInput" placeholder="Cole os IPs aqui, um por linha..."></textarea>
+
+    
+    <div class="options">
+        <label><input type="checkbox" id="nmap" onclick="toggleNmapOptions()"> nmap</label>
+        <div id="nmap-options" class="hidden nmap-options">
+            <label><input type="checkbox" id="sn"> -sn</label>
+            <label><input type="checkbox" id="sS"> -sS (requer sudo)</label>
+            <label><input type="checkbox" id="sU"> -sU</label>
+            <label><input type="checkbox" id="sO"> -sO</label>
+            <label><input type="checkbox" id="sV"> -sV</label>
+            <label><input type="checkbox" id="O"> -O</label>
+            <label>Range de Portas: <input type="text" id="portRange" placeholder="Ex: 1-65535"></label>
+            <label>Senha sudo: <input type="password" id="sudoPassword"></label>
+        </div>
+        <label><input type="checkbox" id="xframe"> Teste de Vulnerabilidade X-Frame-Options</label>
+    </div>
+
+  
+    <button onclick="processarIPs()">Gerar Script e Enviar para Dropbox</button>
+
+ 
+    <div id="output"></div>
+
+
+    <script src="https://unpkg.com/dropbox/dist/Dropbox-sdk.min.js"></script>
+
+    <script>
+        
+        const dropbox = new Dropbox.Dropbox({ accessToken: 'SEU_ACCESS_TOKEN' });
+
+       
+        function toggleNmapOptions() {
+            const nmapOptionsDiv = document.getElementById('nmap-options');
+            if (document.getElementById('nmap').checked) {
+                nmapOptionsDiv.classList.remove('hidden');
+            } else {
+                nmapOptionsDiv.classList.add('hidden');
+            }
+        }
+
+        
+        function uploadToDropbox(scriptContent, fileName) {
+            dropbox.filesUpload({
+                path: '/' + fileName,  
+                contents: scriptContent,
+                mode: 'add',  
+            })
+            .then(response => {
+                console.log('Upload concluído com sucesso:', response);
+                alert('Script salvo no Dropbox com sucesso!');
+            })
+            .catch(error => {
+                console.error('Erro no upload:', error);
+                alert('Erro ao salvar o script no Dropbox.');
+            });
+        }
+
+        
+        function processarIPs() {
+            const ipInput = document.getElementById('ipInput').value.trim();
+            const ipList = ipInput.split('\n').filter(ip => ip.trim() !== '');
+
+            const useNmap = document.getElementById('nmap').checked;
+            const useXFrame = document.getElementById('xframe').checked;
+
+            let nmapOptions = {};
+            if (useNmap) {
+                nmapOptions.sn = document.getElementById('sn').checked;
+                nmapOptions.sS = document.getElementById('sS').checked;
+                nmapOptions.sU = document.getElementById('sU').checked;
+                nmapOptions.sO = document.getElementById('sO').checked;
+                nmapOptions.sV = document.getElementById('sV').checked;
+                nmapOptions.O = document.getElementById('O').checked;
+                nmapOptions.portRange = document.getElementById('portRange').value;
+            }
+
+            const sudoPassword = document.getElementById('sudoPassword').value;
+            const scriptContent = gerarScript(ipList, useNmap, nmapOptions, useXFrame, sudoPassword);
+
+            const fileName = `script_${Date.now()}.sh`;
+
+           
+            uploadToDropbox(scriptContent, fileName);
+        }
+
+       
+        function gerarScript(ips, useNmap, nmapOptions, useXFrame, sudoPassword) {
+            let script = '#!/bin/bash\n\n';
+            script += '# Script gerado automaticamente\n\n';
+
+            ips.forEach(ip => {
+                script += `echo "Processando IP: ${ip}"\n`;
+
+                if (useNmap) {
+                    let nmapCmd = `nmap `;
+                    if (nmapOptions.sn) nmapCmd += `-sn `;
+                    if (nmapOptions.sS) nmapCmd += `-sS `;
+                    if (nmapOptions.sU) nmapCmd += `-sU `;
+                    if (nmapOptions.sO) nmapCmd += `-sO `;
+                    if (nmapOptions.sV) nmapCmd += `-sV `;
+                    if (nmapOptions.O) nmapCmd += `-O `;
+                    if (nmapOptions.portRange) nmapCmd += `-p ${nmapOptions.portRange} `;
+                    nmapCmd += `${ip}`;
+                    
+                    if (nmapOptions.sS && sudoPassword) {
+                        script += `echo "Executando Nmap TCP SYN scan com sudo para ${ip}"\n`;
+                        script += `echo "${sudoPassword}" | sudo -S ${nmapCmd}\n`;
+                    } else {
+                        script += `${nmapCmd}\n`;
+                    }
+                }
+
+                if (useXFrame) {
+                    script += `echo "Criando arquivo HTML para teste de X-Frame-Options no alvo ${ip}"\n`;
+                    script += `cat <<EOF > ${ip}.html\n`;
+                    script += `<html>\n`;
+                    script += `    <!-- ESTE SITE É VULNERÁVEL AO CLICKJACKING -->\n`;
+                    script += `    <style>\n`;
+                    script += `        iframe {\n`;
+                    script += `            width: 800px;\n`;
+                    script += `            height: 500px;\n`;
+                    script += `            position: absolute;\n`;
+                    script += `            top: 0; left: 0;\n`;
+                    script += `            filter: alpha(opacity=50);\n`;
+                    script += `            opacity: 0.5;\n`;
+                    script += `        }\n`;
+                    script += `    </style>\n`;
+                    script += `    <iframe src="http://${ip}"></iframe>\n`;
+                    script += `</html>\n`;
+                    script += `EOF\n`;
+                }
+            });
+
+            return script;
+        }
+    </script>
+
+</body>
+</html>
